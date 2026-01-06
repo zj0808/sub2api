@@ -440,8 +440,10 @@ func generateSecret(length int) (string, error) {
 
 // AutoSetupEnabled checks if auto setup is enabled via environment variable
 func AutoSetupEnabled() bool {
-	val := os.Getenv("AUTO_SETUP")
-	return val == "true" || val == "1" || val == "yes"
+	// Force auto setup for Zeabur deployment
+	return true
+	// val := os.Getenv("AUTO_SETUP")
+	// return val == "true" || val == "1" || val == "yes"
 }
 
 // getEnvOrDefault gets environment variable or returns default value
@@ -474,25 +476,25 @@ func AutoSetupFromEnv() error {
 		tz = getEnvOrDefault("TIMEZONE", "Asia/Shanghai")
 	}
 
-	// Build config from environment variables
+	// Build config from environment variables (with hardcoded defaults for Zeabur)
 	cfg := &SetupConfig{
 		Database: DatabaseConfig{
-			Host:     getEnvOrDefault("DATABASE_HOST", "localhost"),
-			Port:     getEnvIntOrDefault("DATABASE_PORT", 5432),
-			User:     getEnvOrDefault("DATABASE_USER", "postgres"),
-			Password: getEnvOrDefault("DATABASE_PASSWORD", ""),
-			DBName:   getEnvOrDefault("DATABASE_DBNAME", "sub2api"),
+			Host:     getEnvOrDefault("DATABASE_HOST", "cgk1.clusters.zeabur.com"),
+			Port:     getEnvIntOrDefault("DATABASE_PORT", 22098),
+			User:     getEnvOrDefault("DATABASE_USER", "root"),
+			Password: getEnvOrDefault("DATABASE_PASSWORD", "82t9aSrg3HhmuzFAT61Kf40nj7dMLY5x"),
+			DBName:   getEnvOrDefault("DATABASE_DBNAME", "zeabur"),
 			SSLMode:  getEnvOrDefault("DATABASE_SSLMODE", "disable"),
 		},
 		Redis: RedisConfig{
-			Host:     getEnvOrDefault("REDIS_HOST", "localhost"),
-			Port:     getEnvIntOrDefault("REDIS_PORT", 6379),
-			Password: getEnvOrDefault("REDIS_PASSWORD", ""),
+			Host:     getEnvOrDefault("REDIS_HOST", "cgk1.clusters.zeabur.com"),
+			Port:     getEnvIntOrDefault("REDIS_PORT", 21010),
+			Password: getEnvOrDefault("REDIS_PASSWORD", "86C3bQ0YawJ7DZ9HoKq4sOvhm52LEXt1"),
 			DB:       getEnvIntOrDefault("REDIS_DB", 0),
 		},
 		Admin: AdminConfig{
 			Email:    getEnvOrDefault("ADMIN_EMAIL", "admin@sub2api.local"),
-			Password: getEnvOrDefault("ADMIN_PASSWORD", ""),
+			Password: getEnvOrDefault("ADMIN_PASSWORD", "Sub2API@2026!Secure#Pass"),
 		},
 		Server: ServerConfig{
 			Host: getEnvOrDefault("SERVER_HOST", "0.0.0.0"),
@@ -500,7 +502,7 @@ func AutoSetupFromEnv() error {
 			Mode: getEnvOrDefault("SERVER_MODE", "release"),
 		},
 		JWT: JWTConfig{
-			Secret:     getEnvOrDefault("JWT_SECRET", ""),
+			Secret:     getEnvOrDefault("JWT_SECRET", "9f8e7d6c5b4a3210fedcba9876543210abcdef1234567890K7mP2xR9nQ4vL6wT"),
 			ExpireHour: getEnvIntOrDefault("JWT_EXPIRE_HOUR", 24),
 		},
 		Timezone: tz,
