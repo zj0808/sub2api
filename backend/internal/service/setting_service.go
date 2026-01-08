@@ -217,8 +217,8 @@ func (s *SettingService) InitializeDefaultSettings(ctx context.Context) error {
 		SettingKeyFallbackModelOpenAI:      "gpt-4o",
 		SettingKeyFallbackModelGemini:      "gemini-2.5-pro",
 		SettingKeyFallbackModelAntigravity: "gemini-2.5-pro",
-		// Identity patch defaults
-		SettingKeyEnableIdentityPatch: "true",
+		// Identity patch defaults (disabled by default to avoid Antigravity detection)
+		SettingKeyEnableIdentityPatch: "false",
 		SettingKeyIdentityPatchPrompt: "",
 	}
 
@@ -319,8 +319,8 @@ func (s *SettingService) GetTurnstileSecretKey(ctx context.Context) string {
 func (s *SettingService) IsIdentityPatchEnabled(ctx context.Context) bool {
 	value, err := s.settingRepo.GetValue(ctx, SettingKeyEnableIdentityPatch)
 	if err != nil {
-		// 默认开启，保持兼容
-		return true
+		// 默认关闭，避免 Antigravity 平台检测拦截
+		return false
 	}
 	return value == "true"
 }
