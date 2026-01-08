@@ -1066,6 +1066,9 @@ export default {
       bulkActions: {
         selected: '{count} account(s) selected',
         selectCurrentPage: 'Select this page',
+        selectAll: 'Select All',
+        invertSelection: 'Invert',
+        clearSelection: 'Clear',
         clear: 'Clear selection',
         edit: 'Bulk Edit',
         delete: 'Bulk Delete'

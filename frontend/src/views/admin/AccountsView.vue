@@ -19,7 +19,7 @@
         </div>
       </template>
       <template #table>
-        <AccountBulkActionsBar :selected-ids="selIds" @delete="handleBulkDelete" @edit="showBulkEdit = true" @clear="selIds = []" @select-page="selectPage" />
+        <AccountBulkActionsBar :selected-ids="selIds" @delete="handleBulkDelete" @edit="showBulkEdit = true" @clear="selIds = []" @select-page="selectPage" @select-all="selectAll" @invert-selection="invertSelection" />
         <DataTable :columns="cols" :data="accounts" :loading="loading">
           <template #cell-select="{ row }">
             <input type="checkbox" :checked="selIds.includes(row.id)" @change="toggleSel(row.id)" class="rounded border-gray-300 text-primary-600 focus:ring-primary-500" />
@@ -188,6 +188,8 @@ const handleEdit = (a: Account) => { edAcc.value = a; showEdit.value = true }
 const openMenu = (a: Account, e: MouseEvent) => { menu.acc = a; menu.pos = { top: e.clientY, left: e.clientX - 200 }; menu.show = true }
 const toggleSel = (id: number) => { const i = selIds.value.indexOf(id); if(i === -1) selIds.value.push(id); else selIds.value.splice(i, 1) }
 const selectPage = () => { selIds.value = [...new Set([...selIds.value, ...accounts.value.map(a => a.id)])] }
+const selectAll = () => { selIds.value = accounts.value.map(a => a.id) }
+const invertSelection = () => { const currentPageIds = accounts.value.map(a => a.id); selIds.value = currentPageIds.filter(id => !selIds.value.includes(id)) }
 const handleBulkDelete = async () => { if(!confirm(t('common.confirm'))) return; try { await Promise.all(selIds.value.map(id => adminAPI.accounts.delete(id))); selIds.value = []; reload() } catch (error) { console.error('Failed to bulk delete accounts:', error) } }
 const handleBulkUpdated = () => { showBulkEdit.value = false; selIds.value = []; reload() }
 const closeTestModal = () => { showTest.value = false; testingAcc.value = null }
