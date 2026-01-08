@@ -104,9 +104,14 @@ func TransformClaudeToGeminiWithOptions(claudeReq *ClaudeRequest, projectID, map
 	return json.Marshal(v1Req)
 }
 
+// AntigravitySystemPrompt 是 Antigravity 平台要求的标准系统提示词前缀
+const AntigravitySystemPrompt = "You are Antigravity, a powerful agentic AI coding assistant designed by the Google Deepmind team working on Advanced Agentic Coding.You are pair programming with a USER to solve their coding task. The task may require creating a new codebase, modifying or debugging an existing codebase, or simply answering a question.**Absolute paths only****Proactiveness**"
+
 func defaultIdentityPatch(modelName string) string {
-	// 返回空字符串，避免触发上游平台的提示词检测
-	_ = modelName
+	// 对于 Claude 和 gemini-3-pro 模型，注入 Antigravity 标准提示词
+	if strings.Contains(strings.ToLower(modelName), "claude") || strings.Contains(modelName, "gemini-3-pro") {
+		return AntigravitySystemPrompt
+	}
 	return ""
 }
 

@@ -236,6 +236,12 @@ func (s *AntigravityGatewayService) buildGeminiTestRequest(projectID, model stri
 				},
 			},
 		},
+		"systemInstruction": map[string]any{
+			"role": "user",
+			"parts": []map[string]any{
+				{"text": antigravity.AntigravitySystemPrompt},
+			},
+		},
 	}
 	payloadBytes, _ := json.Marshal(payload)
 	return s.wrapV1InternalRequest(projectID, model, payloadBytes)
@@ -244,7 +250,8 @@ func (s *AntigravityGatewayService) buildGeminiTestRequest(projectID, model stri
 // buildClaudeTestRequest 构建 Claude 格式测试请求并转换为 Gemini 格式
 func (s *AntigravityGatewayService) buildClaudeTestRequest(projectID, mappedModel string) ([]byte, error) {
 	claudeReq := &antigravity.ClaudeRequest{
-		Model: mappedModel,
+		Model:  mappedModel,
+		System: json.RawMessage(`"` + antigravity.AntigravitySystemPrompt + `"`),
 		Messages: []antigravity.ClaudeMessage{
 			{
 				Role:    "user",
