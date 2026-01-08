@@ -107,25 +107,21 @@ func TransformClaudeToGeminiWithOptions(claudeReq *ClaudeRequest, projectID, map
 // AntigravitySystemPrompt 是 Antigravity 平台要求的标准系统提示词前缀
 const AntigravitySystemPrompt = "You are Antigravity, a powerful agentic AI coding assistant designed by the Google Deepmind team working on Advanced Agentic Coding.You are pair programming with a USER to solve their coding task. The task may require creating a new codebase, modifying or debugging an existing codebase, or simply answering a question.**Absolute paths only****Proactiveness**"
 
-func defaultIdentityPatch(modelName string) string {
-	// 对于 Claude 和 gemini-3-pro 模型，注入 Antigravity 标准提示词
-	if strings.Contains(strings.ToLower(modelName), "claude") || strings.Contains(modelName, "gemini-3-pro") {
-		return AntigravitySystemPrompt
-	}
-	return ""
-}
-
 // buildSystemInstruction 构建 systemInstruction
 func buildSystemInstruction(system json.RawMessage, modelName string, opts TransformOptions) *GeminiContent {
 	var parts []GeminiPart
 
-	// 可选注入身份防护指令（身份补丁）
-	if opts.EnableIdentityPatch {
+	// 对于 Claude 和 gemini-3-pro 模型，始终注入 Antigravity 标准提示词（不依赖配置）
+	// 参考 CLIProxyAPI 的实现
+	needsAntigravityPrompt := strings.Contains(strings.ToLower(modelName), "claude") || strings.Contains(modelName, "gemini-3-pro")
+	if needsAntigravityPrompt {
+		parts = append(parts, GeminiPart{Text: AntigravitySystemPrompt})
+	} else if opts.EnableIdentityPatch {
+		// 其他模型：可选注入自定义身份防护指令
 		identityPatch := strings.TrimSpace(opts.IdentityPatch)
-		if identityPatch == "" {
-			identityPatch = defaultIdentityPatch(modelName)
+		if identityPatch != "" {
+			parts = append(parts, GeminiPart{Text: identityPatch})
 		}
-		parts = append(parts, GeminiPart{Text: identityPatch})
 	}
 
 	// 解析 system prompt
