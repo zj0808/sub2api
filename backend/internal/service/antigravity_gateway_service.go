@@ -249,9 +249,10 @@ func (s *AntigravityGatewayService) buildGeminiTestRequest(projectID, model stri
 
 // buildClaudeTestRequest 构建 Claude 格式测试请求并转换为 Gemini 格式
 func (s *AntigravityGatewayService) buildClaudeTestRequest(projectID, mappedModel string) ([]byte, error) {
+	// 不设置 System，让 TransformClaudeToGemini 内部的 buildSystemInstruction 自动注入 AntigravitySystemPrompt
 	claudeReq := &antigravity.ClaudeRequest{
 		Model:  mappedModel,
-		System: json.RawMessage(`"` + antigravity.AntigravitySystemPrompt + `"`),
+		System: nil,
 		Messages: []antigravity.ClaudeMessage{
 			{
 				Role:    "user",
