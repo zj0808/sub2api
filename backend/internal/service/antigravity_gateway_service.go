@@ -247,22 +247,28 @@ func (s *AntigravityGatewayService) buildGeminiTestRequest(projectID, model stri
 	return s.wrapV1InternalRequest(projectID, model, payloadBytes)
 }
 
-// buildClaudeTestRequest 构建 Claude 格式测试请求并转换为 Gemini 格式
+// buildClaudeTestRequest 构建 Claude 模型测试请求（直接使用 Gemini 格式）
+// 与 buildGeminiTestRequest 使用相同的方式，保持一致性
 func (s *AntigravityGatewayService) buildClaudeTestRequest(projectID, mappedModel string) ([]byte, error) {
-	// 不设置 System，让 TransformClaudeToGemini 内部的 buildSystemInstruction 自动注入 AntigravitySystemPrompt
-	claudeReq := &antigravity.ClaudeRequest{
-		Model:  mappedModel,
-		System: nil,
-		Messages: []antigravity.ClaudeMessage{
+	// 直接构建 Gemini 格式请求，与正常通道保持一致
+	payload := map[string]any{
+		"contents": []map[string]any{
 			{
-				Role:    "user",
-				Content: json.RawMessage(`"hi"`),
+				"role": "user",
+				"parts": []map[string]any{
+					{"text": "hi"},
+				},
 			},
 		},
-		MaxTokens: 1024,
-		Stream:    false,
+		"systemInstruction": map[string]any{
+			"role": "user",
+			"parts": []map[string]any{
+				{"text": antigravity.AntigravitySystemPrompt},
+			},
+		},
 	}
-	return antigravity.TransformClaudeToGemini(claudeReq, projectID, mappedModel)
+	payloadBytes, _ := json.Marshal(payload)
+	return s.wrapV1InternalRequest(projectID, mappedModel, payloadBytes)
 }
 
 func (s *AntigravityGatewayService) getClaudeTransformOptions(ctx context.Context) antigravity.TransformOptions {
