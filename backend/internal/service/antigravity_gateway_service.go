@@ -242,6 +242,7 @@ func (s *AntigravityGatewayService) buildGeminiTestRequest(projectID, model stri
 				{"text": antigravity.AntigravitySystemPrompt},
 			},
 		},
+		"safetySettings": antigravity.DefaultSafetySettings,
 	}
 	payloadBytes, _ := json.Marshal(payload)
 	return s.wrapV1InternalRequest(projectID, model, payloadBytes)
@@ -266,6 +267,7 @@ func (s *AntigravityGatewayService) buildClaudeTestRequest(projectID, mappedMode
 				{"text": antigravity.AntigravitySystemPrompt},
 			},
 		},
+		"safetySettings": antigravity.DefaultSafetySettings,
 	}
 	payloadBytes, _ := json.Marshal(payload)
 	return s.wrapV1InternalRequest(projectID, mappedModel, payloadBytes)
