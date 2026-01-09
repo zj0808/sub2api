@@ -248,29 +248,24 @@ func (s *AntigravityGatewayService) buildGeminiTestRequest(projectID, model stri
 	return s.wrapV1InternalRequest(projectID, model, payloadBytes)
 }
 
-// buildClaudeTestRequest 构建 Claude 模型测试请求（直接使用 Gemini 格式）
-// 与 buildGeminiTestRequest 使用相同的方式，保持一致性
+// buildClaudeTestRequest 构建 Claude 模型测试请求
+// 使用与正常通道完全一致的转换逻辑
 func (s *AntigravityGatewayService) buildClaudeTestRequest(projectID, mappedModel string) ([]byte, error) {
-	// 直接构建 Gemini 格式请求，与正常通道保持一致
-	payload := map[string]any{
-		"contents": []map[string]any{
+	// 构建一个简单的 Claude 请求，然后使用正常通道的转换逻辑
+	claudeReq := &antigravity.ClaudeRequest{
+		Model:     mappedModel,
+		System:    nil, // 让 buildSystemInstruction 自动注入 AntigravitySystemPrompt
+		MaxTokens: 1024,
+		Stream:    false,
+		Messages: []antigravity.ClaudeMessage{
 			{
-				"role": "user",
-				"parts": []map[string]any{
-					{"text": "hi"},
-				},
+				Role:    "user",
+				Content: json.RawMessage(`"hi"`),
 			},
 		},
-		"systemInstruction": map[string]any{
-			"role": "user",
-			"parts": []map[string]any{
-				{"text": antigravity.AntigravitySystemPrompt},
-			},
-		},
-		"safetySettings": antigravity.DefaultSafetySettings,
 	}
-	payloadBytes, _ := json.Marshal(payload)
-	return s.wrapV1InternalRequest(projectID, mappedModel, payloadBytes)
+	// 使用与正常通道完全相同的转换函数
+	return antigravity.TransformClaudeToGeminiWithOptions(claudeReq, projectID, mappedModel, antigravity.DefaultTransformOptions())
 }
 
 func (s *AntigravityGatewayService) getClaudeTransformOptions(ctx context.Context) antigravity.TransformOptions {
