@@ -15,8 +15,7 @@ func NewAntigravityOAuthHandler(antigravityOAuthService *service.AntigravityOAut
 }
 
 type AntigravityGenerateAuthURLRequest struct {
-	ProxyID     *int64 `json:"proxy_id"`
-	RedirectURI string `json:"redirect_uri"`
+	ProxyID *int64 `json:"proxy_id"`
 }
 
 // GenerateAuthURL generates Google OAuth authorization URL
@@ -24,33 +23,17 @@ type AntigravityGenerateAuthURLRequest struct {
 func (h *AntigravityOAuthHandler) GenerateAuthURL(c *gin.Context) {
 	var req AntigravityGenerateAuthURLRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		// Allow empty body
-		req = AntigravityGenerateAuthURLRequest{}
+		response.BadRequest(c, "请求无效: "+err.Error())
+		return
 	}
 
-	// 如果没有传入 redirect_uri，自动推导
-	redirectURI := req.RedirectURI
-	if redirectURI == "" {
-		redirectURI = deriveAntigravityRedirectURI(c)
-	}
-
-	result, err := h.antigravityOAuthService.GenerateAuthURL(c.Request.Context(), req.ProxyID, redirectURI)
+	result, err := h.antigravityOAuthService.GenerateAuthURL(c.Request.Context(), req.ProxyID)
 	if err != nil {
 		response.InternalError(c, "生成授权链接失败: "+err.Error())
 		return
 	}
 
 	response.Success(c, result)
-}
-
-// deriveAntigravityRedirectURI 从请求上下文推导回调地址
-func deriveAntigravityRedirectURI(c *gin.Context) string {
-	scheme := "http"
-	if c.Request.TLS != nil || c.GetHeader("X-Forwarded-Proto") == "https" {
-		scheme = "https"
-	}
-	host := c.Request.Host
-	return scheme + "://" + host + "/auth/callback"
 }
 
 type AntigravityExchangeCodeRequest struct {
