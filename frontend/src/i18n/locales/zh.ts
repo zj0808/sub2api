@@ -230,7 +230,10 @@ export default {
     oauth: {
       code: '授权码',
       state: '状态',
-      fullUrl: '完整URL'
+      fullUrl: '完整URL',
+      authSuccess: '授权成功',
+      autoCloseHint: '授权信息已自动传回，窗口将在 2 秒后关闭...',
+      manualCloseHint: '如果窗口没有自动关闭，您可以手动关闭此窗口'
     }
   },
 
@@ -1335,6 +1338,8 @@ export default {
         generateAuthUrl: '生成授权 URL',
         generating: '生成中...',
         regenerate: '重新生成',
+        openAuthWindow: '打开授权窗口',
+        waitingForAuth: '等待授权完成...',
         step2OpenUrl: '在浏览器中打开 URL 并完成授权',
         openUrlDesc: '在新标签页中打开授权 URL，登录您的 Claude 账号并授权。',
         proxyWarning:

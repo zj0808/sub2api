@@ -284,6 +284,25 @@
                       />
                     </button>
                   </div>
+                  <!-- 打开授权窗口按钮 -->
+                  <div class="flex items-center gap-2">
+                    <button
+                      type="button"
+                      class="btn btn-primary flex-1 text-sm"
+                      @click="handleOpenAuthWindow"
+                    >
+                      <Icon name="externalLink" size="sm" class="mr-2" />
+                      {{ t('admin.accounts.oauth.openAuthWindow') }}
+                    </button>
+                  </div>
+                  <!-- 授权状态提示 -->
+                  <div v-if="authWindowOpened" class="flex items-center gap-2 text-xs">
+                    <svg class="h-4 w-4 animate-spin text-blue-500" fill="none" viewBox="0 0 24 24">
+                      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <span class="text-blue-600 dark:text-blue-400">{{ t('admin.accounts.oauth.waitingForAuth') }}</span>
+                  </div>
                   <button
                     type="button"
                     class="text-xs text-blue-600 hover:text-blue-700 dark:text-blue-400"
@@ -411,7 +430,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useClipboard } from '@/composables/useClipboard'
 import Icon from '@/components/icons/Icon.vue'
@@ -490,9 +509,39 @@ const sessionKeyInput = ref('')
 const showHelpDialog = ref(false)
 const oauthState = ref('')
 const projectId = ref('')
+const authWindowOpened = ref(false)
+let authWindow: Window | null = null
 
 // Clipboard
 const { copied, copyToClipboard } = useClipboard()
+
+// 监听来自弹窗的消息
+const handleOAuthMessage = (event: MessageEvent) => {
+  // 验证来源
+  if (event.origin !== window.location.origin) return
+
+  const data = event.data
+  if (data?.type === 'oauth_callback') {
+    // 收到授权回调
+    if (data.code) {
+      authCodeInput.value = data.code
+    }
+    if (data.state) {
+      oauthState.value = data.state
+    }
+    authWindowOpened.value = false
+    authWindow = null
+  }
+}
+
+// 生命周期
+onMounted(() => {
+  window.addEventListener('message', handleOAuthMessage)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('message', handleOAuthMessage)
+})
 
 // Computed
 const parsedKeyCount = computed(() => {
@@ -560,6 +609,37 @@ const handleRegenerate = () => {
 const handleCookieAuth = () => {
   if (sessionKeyInput.value.trim()) {
     emit('cookie-auth', sessionKeyInput.value)
+  }
+}
+
+// 打开授权窗口
+const handleOpenAuthWindow = () => {
+  if (!props.authUrl) return
+
+  // 计算弹窗位置（居中）
+  const width = 600
+  const height = 700
+  const left = window.screenX + (window.outerWidth - width) / 2
+  const top = window.screenY + (window.outerHeight - height) / 2
+
+  // 打开弹窗
+  authWindow = window.open(
+    props.authUrl,
+    'oauth_popup',
+    `width=${width},height=${height},left=${left},top=${top},scrollbars=yes,resizable=yes`
+  )
+
+  if (authWindow) {
+    authWindowOpened.value = true
+
+    // 定期检查弹窗是否关闭
+    const checkClosed = setInterval(() => {
+      if (authWindow?.closed) {
+        clearInterval(checkClosed)
+        authWindowOpened.value = false
+        authWindow = null
+      }
+    }, 500)
   }
 }
 

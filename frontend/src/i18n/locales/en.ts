@@ -232,7 +232,10 @@ export default {
     oauth: {
       code: 'Code',
       state: 'State',
-      fullUrl: 'Full URL'
+      fullUrl: 'Full URL',
+      authSuccess: 'Authorization Successful',
+      autoCloseHint: 'Authorization info has been sent back. This window will close in 2 seconds...',
+      manualCloseHint: 'If the window does not close automatically, you can close it manually'
     }
   },
 
@@ -1202,6 +1205,8 @@ export default {
         generateAuthUrl: 'Generate Auth URL',
         generating: 'Generating...',
         regenerate: 'Regenerate',
+        openAuthWindow: 'Open Auth Window',
+        waitingForAuth: 'Waiting for authorization...',
         step2OpenUrl: 'Open the URL in your browser and complete authorization',
         openUrlDesc:
           'Open the authorization URL in a new tab, log in to your Claude account and authorize.',
