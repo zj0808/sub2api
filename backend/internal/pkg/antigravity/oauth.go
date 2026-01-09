@@ -46,6 +46,7 @@ const (
 type OAuthSession struct {
 	State        string    `json:"state"`
 	CodeVerifier string    `json:"code_verifier"`
+	RedirectURI  string    `json:"redirect_uri,omitempty"`
 	ProxyURL     string    `json:"proxy_url,omitempty"`
 	CreatedAt    time.Time `json:"created_at"`
 }
@@ -162,10 +163,13 @@ func base64URLEncode(data []byte) string {
 }
 
 // BuildAuthorizationURL 构建 Google OAuth 授权 URL
-func BuildAuthorizationURL(state, codeChallenge string) string {
+func BuildAuthorizationURL(state, codeChallenge, redirectURI string) string {
+	if redirectURI == "" {
+		redirectURI = RedirectURI
+	}
 	params := url.Values{}
 	params.Set("client_id", ClientID)
-	params.Set("redirect_uri", RedirectURI)
+	params.Set("redirect_uri", redirectURI)
 	params.Set("response_type", "code")
 	params.Set("scope", Scopes)
 	params.Set("state", state)

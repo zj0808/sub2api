@@ -30,7 +30,7 @@ type AntigravityAuthURLResult struct {
 }
 
 // GenerateAuthURL 生成 Google OAuth 授权链接
-func (s *AntigravityOAuthService) GenerateAuthURL(ctx context.Context, proxyID *int64) (*AntigravityAuthURLResult, error) {
+func (s *AntigravityOAuthService) GenerateAuthURL(ctx context.Context, proxyID *int64, redirectURI string) (*AntigravityAuthURLResult, error) {
 	state, err := antigravity.GenerateState()
 	if err != nil {
 		return nil, fmt.Errorf("生成 state 失败: %w", err)
@@ -54,16 +54,22 @@ func (s *AntigravityOAuthService) GenerateAuthURL(ctx context.Context, proxyID *
 		}
 	}
 
+	// 使用默认 redirect_uri 如果未指定
+	if redirectURI == "" {
+		redirectURI = antigravity.RedirectURI
+	}
+
 	session := &antigravity.OAuthSession{
 		State:        state,
 		CodeVerifier: codeVerifier,
+		RedirectURI:  redirectURI,
 		ProxyURL:     proxyURL,
 		CreatedAt:    time.Now(),
 	}
 	s.sessionStore.Set(sessionID, session)
 
 	codeChallenge := antigravity.GenerateCodeChallenge(codeVerifier)
-	authURL := antigravity.BuildAuthorizationURL(state, codeChallenge)
+	authURL := antigravity.BuildAuthorizationURL(state, codeChallenge, redirectURI)
 
 	return &AntigravityAuthURLResult{
 		AuthURL:   authURL,
