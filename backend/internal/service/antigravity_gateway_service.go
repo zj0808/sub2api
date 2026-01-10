@@ -181,22 +181,44 @@ func (s *AntigravityGatewayService) TestConnection(ctx context.Context, account 
 		return nil, fmt.Errorf("构建请求失败: %w", err)
 	}
 
-	// 构建 HTTP 请求（非流式）
-	req, err := antigravity.NewAPIRequest(ctx, "generateContent", accessToken, requestBody)
-	if err != nil {
-		return nil, err
-	}
-
 	// 代理 URL
 	proxyURL := ""
 	if account.ProxyID != nil && account.Proxy != nil {
 		proxyURL = account.Proxy.URL()
 	}
 
-	// 发送请求
-	resp, err := s.httpUpstream.Do(req, proxyURL, account.ID, account.Concurrency)
-	if err != nil {
-		return nil, fmt.Errorf("请求失败: %w", err)
+	// 使用多 Base URL 回退机制发送请求（非流式），带重试
+	prefix := fmt.Sprintf("[Antigravity TestConnection] account=%s model=%s", account.Name, mappedModel)
+	var resp *http.Response
+	for attempt := 1; attempt <= antigravityMaxRetries; attempt++ {
+		// 检查 context 是否已取消
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		default:
+		}
+
+		var reqErr error
+		resp, reqErr = s.doRequestWithBaseURLFallback(ctx, "generateContent", accessToken, requestBody, proxyURL, account.ID, account.Concurrency, prefix)
+		if reqErr != nil {
+			if attempt < antigravityMaxRetries {
+				log.Printf("%s status=request_failed retry=%d/%d error=%v", prefix, attempt, antigravityMaxRetries, reqErr)
+				time.Sleep(time.Duration(attempt) * time.Second)
+				continue
+			}
+			return nil, fmt.Errorf("请求失败: %w", reqErr)
+		}
+
+		// 429 重试
+		if resp.StatusCode == 429 && attempt < antigravityMaxRetries {
+			respBody, _ := io.ReadAll(io.LimitReader(resp.Body, 2<<20))
+			_ = resp.Body.Close()
+			log.Printf("%s status=429 retry=%d/%d body=%s", prefix, attempt, antigravityMaxRetries, string(respBody))
+			time.Sleep(time.Duration(attempt) * time.Second)
+			continue
+		}
+
+		break
 	}
 	defer func() { _ = resp.Body.Close() }()
 
