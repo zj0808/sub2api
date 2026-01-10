@@ -10,11 +10,19 @@ CREATE TABLE IF NOT EXISTS user_allowed_groups (
 
 CREATE INDEX IF NOT EXISTS idx_user_allowed_groups_group_id ON user_allowed_groups(group_id);
 
--- Backfill from the legacy users.allowed_groups array.
-INSERT INTO user_allowed_groups (user_id, group_id)
-SELECT u.id, x.group_id
-FROM users u
-CROSS JOIN LATERAL unnest(u.allowed_groups) AS x(group_id)
-JOIN groups g ON g.id = x.group_id
-WHERE u.allowed_groups IS NOT NULL
-ON CONFLICT DO NOTHING;
+-- Backfill from the legacy users.allowed_groups array (only if column exists).
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'users' AND column_name = 'allowed_groups'
+    ) THEN
+        INSERT INTO user_allowed_groups (user_id, group_id)
+        SELECT u.id, x.group_id
+        FROM users u
+        CROSS JOIN LATERAL unnest(u.allowed_groups) AS x(group_id)
+        JOIN groups g ON g.id = x.group_id
+        WHERE u.allowed_groups IS NOT NULL
+        ON CONFLICT DO NOTHING;
+    END IF;
+END $$;

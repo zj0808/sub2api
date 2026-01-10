@@ -14,14 +14,23 @@ CREATE TABLE IF NOT EXISTS orphan_allowed_groups_audit (
 );
 
 -- 记录孤立的 group_id（存在于 users.allowed_groups 但不存在于 groups 表）
-INSERT INTO orphan_allowed_groups_audit (user_id, group_id)
-SELECT u.id, x.group_id
-FROM users u
-CROSS JOIN LATERAL unnest(u.allowed_groups) AS x(group_id)
-LEFT JOIN groups g ON g.id = x.group_id
-WHERE u.allowed_groups IS NOT NULL
-  AND g.id IS NULL
-ON CONFLICT (user_id, group_id) DO NOTHING;
+-- 仅在 allowed_groups 列存在时执行
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'users' AND column_name = 'allowed_groups'
+    ) THEN
+        INSERT INTO orphan_allowed_groups_audit (user_id, group_id)
+        SELECT u.id, x.group_id
+        FROM users u
+        CROSS JOIN LATERAL unnest(u.allowed_groups) AS x(group_id)
+        LEFT JOIN groups g ON g.id = x.group_id
+        WHERE u.allowed_groups IS NOT NULL
+          AND g.id IS NULL
+        ON CONFLICT (user_id, group_id) DO NOTHING;
+    END IF;
+END $$;
 
 -- 添加索引便于查询
 CREATE INDEX IF NOT EXISTS idx_orphan_allowed_groups_audit_user_id
