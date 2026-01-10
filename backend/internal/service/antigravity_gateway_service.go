@@ -414,7 +414,7 @@ func (s *AntigravityGatewayService) Forward(ctx context.Context, c *gin.Context,
 		action = "streamGenerateContent?alt=sse"
 	}
 
-	// 重试循环
+	// 重试循环（带多 Base URL 回退）
 	var resp *http.Response
 	for attempt := 1; attempt <= antigravityMaxRetries; attempt++ {
 		// 检查 context 是否已取消（客户端断开连接）
@@ -425,12 +425,9 @@ func (s *AntigravityGatewayService) Forward(ctx context.Context, c *gin.Context,
 		default:
 		}
 
-		upstreamReq, err := antigravity.NewAPIRequest(ctx, action, accessToken, geminiBody)
-		if err != nil {
-			return nil, err
-		}
-
-		resp, err = s.httpUpstream.Do(upstreamReq, proxyURL, account.ID, account.Concurrency)
+		// 使用多 Base URL 回退发送请求
+		var err error
+		resp, err = s.doRequestWithBaseURLFallback(ctx, action, accessToken, geminiBody, proxyURL, account.ID, account.Concurrency, prefix)
 		if err != nil {
 			if attempt < antigravityMaxRetries {
 				log.Printf("%s status=request_failed retry=%d/%d error=%v", prefix, attempt, antigravityMaxRetries, err)
@@ -927,7 +924,7 @@ func (s *AntigravityGatewayService) ForwardGemini(ctx context.Context, c *gin.Co
 		upstreamAction += "?alt=sse"
 	}
 
-	// 重试循环
+	// 重试循环（带多 Base URL 回退）
 	var resp *http.Response
 	for attempt := 1; attempt <= antigravityMaxRetries; attempt++ {
 		// 检查 context 是否已取消（客户端断开连接）
@@ -938,12 +935,9 @@ func (s *AntigravityGatewayService) ForwardGemini(ctx context.Context, c *gin.Co
 		default:
 		}
 
-		upstreamReq, err := antigravity.NewAPIRequest(ctx, upstreamAction, accessToken, wrappedBody)
-		if err != nil {
-			return nil, err
-		}
-
-		resp, err = s.httpUpstream.Do(upstreamReq, proxyURL, account.ID, account.Concurrency)
+		// 使用多 Base URL 回退发送请求
+		var err error
+		resp, err = s.doRequestWithBaseURLFallback(ctx, upstreamAction, accessToken, wrappedBody, proxyURL, account.ID, account.Concurrency, prefix)
 		if err != nil {
 			if attempt < antigravityMaxRetries {
 				log.Printf("%s status=request_failed retry=%d/%d error=%v", prefix, attempt, antigravityMaxRetries, err)
@@ -1627,4 +1621,70 @@ func isImageGenerationModel(model string) bool {
 		modelLower == "gemini-2.5-flash-image" ||
 		modelLower == "gemini-2.5-flash-image-preview" ||
 		strings.HasPrefix(modelLower, "gemini-2.5-flash-image-")
+}
+
+// doRequestWithBaseURLFallback 带多 Base URL 回退的请求发送
+// 参考 CLIProxyAPI 实现：sandbox-daily → daily → prod
+// 在网络错误或 429 时自动尝试下一个端点
+func (s *AntigravityGatewayService) doRequestWithBaseURLFallback(
+	ctx context.Context,
+	action, accessToken string,
+	body []byte,
+	proxyURL string,
+	accountID int64,
+	concurrency int,
+	prefix string,
+) (*http.Response, error) {
+	baseURLs := antigravity.BaseURLs()
+
+	var lastResp *http.Response
+	var lastErr error
+
+	for idx, baseURL := range baseURLs {
+		// 检查 context 是否已取消
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		default:
+		}
+
+		req, err := antigravity.NewAPIRequestWithBaseURL(ctx, baseURL, action, accessToken, body)
+		if err != nil {
+			return nil, err
+		}
+
+		resp, err := s.httpUpstream.Do(req, proxyURL, accountID, concurrency)
+		if err != nil {
+			lastErr = err
+			if antigravity.IsRetryableError(err) && idx+1 < len(baseURLs) {
+				log.Printf("%s base_url=%s status=request_error fallback_to=%s error=%v",
+					prefix, baseURL, baseURLs[idx+1], err)
+				continue
+			}
+			return nil, err
+		}
+
+		// 429 时尝试下一个端点
+		if antigravity.IsRetryableStatusCode(resp.StatusCode) && idx+1 < len(baseURLs) {
+			respBody, _ := io.ReadAll(io.LimitReader(resp.Body, 2<<20))
+			_ = resp.Body.Close()
+			log.Printf("%s base_url=%s status=%d fallback_to=%s",
+				prefix, baseURL, resp.StatusCode, baseURLs[idx+1])
+			// 保存最后一次响应信息，以便所有端点都失败时返回
+			lastResp = &http.Response{
+				StatusCode: resp.StatusCode,
+				Header:     resp.Header.Clone(),
+				Body:       io.NopCloser(bytes.NewReader(respBody)),
+			}
+			continue
+		}
+
+		return resp, nil
+	}
+
+	// 所有端点都失败
+	if lastResp != nil {
+		return lastResp, nil
+	}
+	return nil, lastErr
 }

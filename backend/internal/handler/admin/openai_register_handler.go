@@ -1,6 +1,8 @@
 package admin
 
 import (
+	"log"
+
 	"github.com/gin-gonic/gin"
 
 	"github.com/Wei-Shaw/sub2api/internal/pkg/cloudmail"
@@ -56,11 +58,16 @@ type SessionToRTRequest struct {
 // AutoRegister handles automatic OpenAI account registration
 // POST /api/v1/admin/openai/auto-register
 func (h *OpenAIRegisterHandler) AutoRegister(c *gin.Context) {
+	log.Printf("[AutoRegister] Handler called")
+
 	var req AutoRegisterRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
+		log.Printf("[AutoRegister] Bind error: %v", err)
 		response.BadRequest(c, "Invalid request: "+err.Error())
 		return
 	}
+
+	log.Printf("[AutoRegister] Request: email=%s, hasMailConfig=%v", req.Email, req.MailAdminEmail != "")
 
 	// 构建邮局配置
 	var mailConfig *service.MailConfig
@@ -72,6 +79,7 @@ func (h *OpenAIRegisterHandler) AutoRegister(c *gin.Context) {
 		}
 	}
 
+	log.Printf("[AutoRegister] Calling registerService.AutoRegister...")
 	result, err := h.registerService.AutoRegister(c.Request.Context(), &service.AutoRegisterInput{
 		Email:      req.Email,
 		Password:   req.Password,
@@ -79,9 +87,11 @@ func (h *OpenAIRegisterHandler) AutoRegister(c *gin.Context) {
 		MailConfig: mailConfig,
 	})
 	if err != nil {
+		log.Printf("[AutoRegister] Error: %v", err)
 		response.ErrorFrom(c, err)
 		return
 	}
+	log.Printf("[AutoRegister] Result: success=%v, error=%s", result.Success, result.Error)
 
 	// 如果需要自动创建账号且注册成功
 	if req.CreateAccount && result.Success && result.RefreshToken != "" {

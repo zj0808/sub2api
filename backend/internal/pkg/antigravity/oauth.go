@@ -32,11 +32,13 @@ const (
 		"https://www.googleapis.com/auth/cclog " +
 		"https://www.googleapis.com/auth/experimentsandconfigs"
 
-	// API 端点
-	BaseURL = "https://cloudcode-pa.googleapis.com"
+	// API 端点（多端点回退顺序：sandbox-daily → daily → prod）
+	BaseURLSandboxDaily = "https://daily-cloudcode-pa.sandbox.googleapis.com"
+	BaseURLDaily        = "https://daily-cloudcode-pa.googleapis.com"
+	BaseURL             = "https://cloudcode-pa.googleapis.com" // prod
 
-	// User-Agent
-	UserAgent = "antigravity/1.11.9 windows/amd64"
+	// User-Agent（保持与 CLIProxyAPI 同步）
+	UserAgent = "antigravity/1.104.0 darwin/arm64"
 
 	// Session 过期时间
 	SessionTTL = 30 * time.Minute
