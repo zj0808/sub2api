@@ -1,4 +1,4 @@
-package admin
+package cloudmail
 
 import (
 	"context"
@@ -10,15 +10,15 @@ import (
 	"github.com/imroc/req/v3"
 )
 
-// CloudMailConfig 邮局配置
-type CloudMailConfig struct {
+// Config 邮局配置
+type Config struct {
 	BaseURL       string `json:"base_url"`       // 邮局API地址，默认 https://cloud-mail.enrun.ggff.net
 	AdminEmail    string `json:"admin_email"`    // 管理员邮箱
 	AdminPassword string `json:"admin_password"` // 管理员密码
 }
 
-// CloudMailClient 邮局API客户端
-type CloudMailClient struct {
+// Client 邮局API客户端
+type Client struct {
 	baseURL string
 	client  *req.Client
 	token   string
@@ -39,21 +39,21 @@ type EmailItem struct {
 	IsDel      int    `json:"isDel"`
 }
 
-// NewCloudMailClient 创建邮局客户端
-func NewCloudMailClient(cfg CloudMailConfig) *CloudMailClient {
+// NewClient 创建邮局客户端
+func NewClient(cfg Config) *Client {
 	baseURL := cfg.BaseURL
 	if baseURL == "" {
 		baseURL = "https://cloud-mail.enrun.ggff.net"
 	}
 
-	return &CloudMailClient{
+	return &Client{
 		baseURL: baseURL,
 		client:  req.C().SetTimeout(30 * time.Second),
 	}
 }
 
 // Login 登录获取token
-func (c *CloudMailClient) Login(ctx context.Context, email, password string) error {
+func (c *Client) Login(ctx context.Context, email, password string) error {
 	var resp struct {
 		Code    int    `json:"code"`
 		Message string `json:"message"`
@@ -83,7 +83,7 @@ func (c *CloudMailClient) Login(ctx context.Context, email, password string) err
 }
 
 // FetchEmails 获取邮件列表
-func (c *CloudMailClient) FetchEmails(ctx context.Context, toEmail, sendEmail string) ([]EmailItem, error) {
+func (c *Client) FetchEmails(ctx context.Context, toEmail, sendEmail string) ([]EmailItem, error) {
 	var resp struct {
 		Code    int         `json:"code"`
 		Message string      `json:"message"`
@@ -118,7 +118,7 @@ func (c *CloudMailClient) FetchEmails(ctx context.Context, toEmail, sendEmail st
 }
 
 // AddUser 添加邮箱用户
-func (c *CloudMailClient) AddUser(ctx context.Context, email, password string) error {
+func (c *Client) AddUser(ctx context.Context, email, password string) error {
 	var resp struct {
 		Code    int             `json:"code"`
 		Message string          `json:"message"`
@@ -149,7 +149,7 @@ func (c *CloudMailClient) AddUser(ctx context.Context, email, password string) e
 }
 
 // FetchOpenAICode 从邮件中提取OpenAI验证码
-func (c *CloudMailClient) FetchOpenAICode(ctx context.Context, toEmail string) (string, error) {
+func (c *Client) FetchOpenAICode(ctx context.Context, toEmail string) (string, error) {
 	emails, err := c.FetchEmails(ctx, toEmail, "%openai%")
 	if err != nil {
 		return "", err

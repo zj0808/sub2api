@@ -2,9 +2,11 @@ package service
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"time"
 
+	"github.com/Wei-Shaw/sub2api/internal/pkg/cloudmail"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/openai"
 )
 
@@ -20,11 +22,19 @@ func NewOpenAIRegisterService(proxyRepo ProxyRepository) *OpenAIRegisterService 
 	}
 }
 
+// MailConfig 邮局配置
+type MailConfig struct {
+	BaseURL       string `json:"base_url"`
+	AdminEmail    string `json:"admin_email"`
+	AdminPassword string `json:"admin_password"`
+}
+
 // AutoRegisterInput input for auto registration
 type AutoRegisterInput struct {
-	Email    string `json:"email"`
-	Password string `json:"password"`
-	ProxyID  *int64 `json:"proxy_id,omitempty"`
+	Email      string      `json:"email"`
+	Password   string      `json:"password"`
+	ProxyID    *int64      `json:"proxy_id,omitempty"`
+	MailConfig *MailConfig `json:"mail_config,omitempty"` // 邮局配置，用于自动获取验证码
 }
 
 // AutoRegisterResult result of auto registration
@@ -57,6 +67,7 @@ type SessionToRTResult struct {
 }
 
 // AutoRegister performs automatic OpenAI account registration
+// 完整流程: 注册 → 轮询邮箱获取验证码 → 验证邮箱 → 登录获取RT
 func (s *OpenAIRegisterService) AutoRegister(ctx context.Context, input *AutoRegisterInput) (*AutoRegisterResult, error) {
 	proxyURL := s.getProxyURL(ctx, input.ProxyID)
 
@@ -64,21 +75,8 @@ func (s *OpenAIRegisterService) AutoRegister(ctx context.Context, input *AutoReg
 
 	client := openai.NewRegisterClient(proxyURL)
 
-	// Step 1: Try to get sentinel challenge (optional, may not be required)
-	sentinel, err := client.GetSentinelChallenge(ctx)
-	if err != nil {
-		log.Printf("[OpenAIRegister] Sentinel request failed (continuing): %v", err)
-	} else if sentinel.PowChallenge != nil {
-		log.Printf("[OpenAIRegister] PoW challenge received, solving...")
-		powResult, err := openai.SolvePow(sentinel.PowChallenge, 60)
-		if err != nil {
-			log.Printf("[OpenAIRegister] PoW solve failed: %v", err)
-		} else {
-			log.Printf("[OpenAIRegister] PoW solved: %s", powResult.Answer[:16]+"...")
-		}
-	}
-
-	// Step 2: Register via chatgpt.com entry (doesn't verify sentinel)
+	// Step 1: Register via chatgpt.com entry (doesn't verify sentinel)
+	log.Printf("[OpenAIRegister] Step 1: Calling register API...")
 	regResp, err := client.Register(ctx, &openai.RegisterRequest{
 		Email:    input.Email,
 		Password: input.Password,
@@ -87,17 +85,114 @@ func (s *OpenAIRegisterService) AutoRegister(ctx context.Context, input *AutoReg
 		return &AutoRegisterResult{
 			Success: false,
 			Email:   input.Email,
-			Error:   err.Error(),
+			Error:   fmt.Sprintf("注册失败: %v", err),
 		}, err
 	}
+	log.Printf("[OpenAIRegister] Registration API called successfully for: %s", input.Email)
 
-	log.Printf("[OpenAIRegister] Registration completed for: %s", input.Email)
+	// 如果没有提供邮局配置，只完成注册步骤
+	if input.MailConfig == nil {
+		log.Printf("[OpenAIRegister] No mail config provided, returning after registration")
+		return &AutoRegisterResult{
+			Success: regResp.Success,
+			Email:   input.Email,
+			UserID:  regResp.UserID,
+		}, nil
+	}
+
+	// Step 2: 轮询邮箱获取验证码
+	log.Printf("[OpenAIRegister] Step 2: Polling for verification code...")
+	code, err := s.pollForVerificationCode(ctx, input.Email, input.MailConfig)
+	if err != nil {
+		return &AutoRegisterResult{
+			Success: false,
+			Email:   input.Email,
+			Error:   fmt.Sprintf("获取验证码失败: %v", err),
+		}, err
+	}
+	log.Printf("[OpenAIRegister] Got verification code: %s", code)
+
+	// Step 3: 验证邮箱
+	log.Printf("[OpenAIRegister] Step 3: Verifying email...")
+	_, err = client.VerifyEmail(ctx, input.Email, code)
+	if err != nil {
+		return &AutoRegisterResult{
+			Success: false,
+			Email:   input.Email,
+			Error:   fmt.Sprintf("验证邮箱失败: %v", err),
+		}, err
+	}
+	log.Printf("[OpenAIRegister] Email verified successfully")
+
+	// Step 4: 登录获取 refresh_token
+	log.Printf("[OpenAIRegister] Step 4: Logging in to get refresh token...")
+	loginResp, err := client.LoginWithPassword(ctx, input.Email, input.Password)
+	if err != nil {
+		return &AutoRegisterResult{
+			Success: false,
+			Email:   input.Email,
+			Error:   fmt.Sprintf("登录失败: %v", err),
+		}, err
+	}
+	log.Printf("[OpenAIRegister] Login successful, got refresh token")
+
+	expiresAt := time.Now().Unix() + loginResp.ExpiresIn
 
 	return &AutoRegisterResult{
-		Success: regResp.Success,
-		Email:   input.Email,
-		UserID:  regResp.UserID,
+		Success:      true,
+		Email:        input.Email,
+		UserID:       regResp.UserID,
+		AccessToken:  loginResp.AccessToken,
+		RefreshToken: loginResp.RefreshToken,
+		ExpiresAt:    expiresAt,
 	}, nil
+}
+
+// pollForVerificationCode 轮询邮箱获取验证码
+func (s *OpenAIRegisterService) pollForVerificationCode(ctx context.Context, email string, mailCfg *MailConfig) (string, error) {
+	// 最多轮询 60 秒，每 5 秒检查一次
+	maxAttempts := 12
+	interval := 5 * time.Second
+
+	for i := 0; i < maxAttempts; i++ {
+		code, err := s.fetchCodeFromMail(ctx, email, mailCfg)
+		if err == nil && code != "" {
+			return code, nil
+		}
+
+		log.Printf("[OpenAIRegister] Attempt %d: No code yet, waiting %v...", i+1, interval)
+
+		select {
+		case <-ctx.Done():
+			return "", ctx.Err()
+		case <-time.After(interval):
+			// 继续下一次尝试
+		}
+	}
+
+	return "", fmt.Errorf("超时：60秒内未收到验证码")
+}
+
+// fetchCodeFromMail 从邮局获取验证码
+func (s *OpenAIRegisterService) fetchCodeFromMail(ctx context.Context, email string, mailCfg *MailConfig) (string, error) {
+	client := cloudmail.NewClient(cloudmail.Config{
+		BaseURL:       mailCfg.BaseURL,
+		AdminEmail:    mailCfg.AdminEmail,
+		AdminPassword: mailCfg.AdminPassword,
+	})
+
+	// 登录邮局
+	if err := client.Login(ctx, mailCfg.AdminEmail, mailCfg.AdminPassword); err != nil {
+		return "", fmt.Errorf("邮局登录失败: %w", err)
+	}
+
+	// 获取验证码
+	code, err := client.FetchOpenAICode(ctx, email)
+	if err != nil {
+		return "", err
+	}
+
+	return code, nil
 }
 
 // SessionToRT converts session token to refresh token via Codex flow

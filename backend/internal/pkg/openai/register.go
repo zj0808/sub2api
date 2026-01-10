@@ -138,3 +138,104 @@ func (c *RegisterClient) GetCSRFToken(cookies []*http.Cookie) string {
 	return ""
 }
 
+// VerifyEmailRequest represents email verification request
+type VerifyEmailRequest struct {
+	Email string `json:"email"`
+	Code  string `json:"code"`
+}
+
+// VerifyEmailResponse represents email verification response
+type VerifyEmailResponse struct {
+	Success bool   `json:"success"`
+	Error   string `json:"error,omitempty"`
+}
+
+// VerifyEmail submits verification code to OpenAI
+// POST https://auth.openai.com/api/accounts/user/verify
+func (c *RegisterClient) VerifyEmail(ctx context.Context, email, code string) (*VerifyEmailResponse, error) {
+	body, _ := json.Marshal(VerifyEmailRequest{
+		Email: email,
+		Code:  code,
+	})
+
+	r, err := c.client.R().
+		SetContext(ctx).
+		SetHeader("Content-Type", "application/json").
+		SetHeader("Origin", "https://chatgpt.com").
+		SetHeader("Referer", "https://chatgpt.com/").
+		SetBody(body).
+		Post("https://auth.openai.com/api/accounts/user/verify")
+
+	if err != nil {
+		return nil, fmt.Errorf("verify request: %w", err)
+	}
+
+	var resp VerifyEmailResponse
+	if err := json.Unmarshal(r.Bytes(), &resp); err != nil {
+		resp.Error = r.String()
+		resp.Success = false
+	}
+
+	if r.StatusCode >= 400 {
+		return &resp, fmt.Errorf("verify failed: %s", resp.Error)
+	}
+
+	resp.Success = true
+	return &resp, nil
+}
+
+// LoginRequest represents login request
+type LoginRequest struct {
+	GrantType string `json:"grant_type"`
+	ClientID  string `json:"client_id"`
+	Username  string `json:"username"`
+	Password  string `json:"password"`
+	Scope     string `json:"scope"`
+}
+
+// LoginResponse represents login response with tokens
+type LoginResponse struct {
+	AccessToken  string `json:"access_token"`
+	RefreshToken string `json:"refresh_token"`
+	IDToken      string `json:"id_token"`
+	TokenType    string `json:"token_type"`
+	ExpiresIn    int64  `json:"expires_in"`
+	Error        string `json:"error,omitempty"`
+	ErrorDesc    string `json:"error_description,omitempty"`
+}
+
+// LoginWithPassword performs password-based login to get refresh token
+// Uses Resource Owner Password flow
+func (c *RegisterClient) LoginWithPassword(ctx context.Context, email, password string) (*LoginResponse, error) {
+	formData := url.Values{}
+	formData.Set("grant_type", "password")
+	formData.Set("client_id", ClientID)
+	formData.Set("username", email)
+	formData.Set("password", password)
+	formData.Set("scope", DefaultScopes)
+
+	r, err := c.client.R().
+		SetContext(ctx).
+		SetHeader("Content-Type", "application/x-www-form-urlencoded").
+		SetBody(formData.Encode()).
+		Post(LoginURL)
+
+	if err != nil {
+		return nil, fmt.Errorf("login request: %w", err)
+	}
+
+	var resp LoginResponse
+	if err := json.Unmarshal(r.Bytes(), &resp); err != nil {
+		return nil, fmt.Errorf("parse response: %w", err)
+	}
+
+	if r.StatusCode >= 400 || resp.Error != "" {
+		errMsg := resp.ErrorDesc
+		if errMsg == "" {
+			errMsg = resp.Error
+		}
+		return &resp, fmt.Errorf("login failed: %s", errMsg)
+	}
+
+	return &resp, nil
+}

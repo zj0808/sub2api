@@ -3,6 +3,7 @@ package admin
 import (
 	"github.com/gin-gonic/gin"
 
+	"github.com/Wei-Shaw/sub2api/internal/pkg/cloudmail"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/response"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 )
@@ -29,6 +30,16 @@ type AutoRegisterRequest struct {
 	Email    string `json:"email" binding:"required,email"`
 	Password string `json:"password" binding:"required,min=8"`
 	ProxyID  *int64 `json:"proxy_id"`
+	// 邮局配置（用于自动获取验证码）
+	MailBaseURL       string `json:"mail_base_url"`       // 邮局API地址
+	MailAdminEmail    string `json:"mail_admin_email"`    // 邮局管理员邮箱
+	MailAdminPassword string `json:"mail_admin_password"` // 邮局管理员密码
+	// 自动创建账号配置
+	CreateAccount bool    `json:"create_account"` // 是否自动创建账号
+	Name          string  `json:"name"`           // 账号名称
+	Concurrency   int     `json:"concurrency"`
+	Priority      int     `json:"priority"`
+	GroupIDs      []int64 `json:"group_ids"`
 }
 
 // SessionToRTRequest request for session to RT conversion
@@ -51,17 +62,71 @@ func (h *OpenAIRegisterHandler) AutoRegister(c *gin.Context) {
 		return
 	}
 
+	// 构建邮局配置
+	var mailConfig *service.MailConfig
+	if req.MailAdminEmail != "" && req.MailAdminPassword != "" {
+		mailConfig = &service.MailConfig{
+			BaseURL:       req.MailBaseURL,
+			AdminEmail:    req.MailAdminEmail,
+			AdminPassword: req.MailAdminPassword,
+		}
+	}
+
 	result, err := h.registerService.AutoRegister(c.Request.Context(), &service.AutoRegisterInput{
-		Email:    req.Email,
-		Password: req.Password,
-		ProxyID:  req.ProxyID,
+		Email:      req.Email,
+		Password:   req.Password,
+		ProxyID:    req.ProxyID,
+		MailConfig: mailConfig,
 	})
 	if err != nil {
 		response.ErrorFrom(c, err)
 		return
 	}
 
-	response.Success(c, result)
+	// 如果需要自动创建账号且注册成功
+	if req.CreateAccount && result.Success && result.RefreshToken != "" {
+		name := req.Name
+		if name == "" {
+			name = req.Email
+		}
+
+		credentials := map[string]any{
+			"access_token":  result.AccessToken,
+			"refresh_token": result.RefreshToken,
+			"expires_at":    result.ExpiresAt,
+			"email":         result.Email,
+		}
+
+		account, err := h.adminService.CreateAccount(c.Request.Context(), &service.CreateAccountInput{
+			Name:        name,
+			Platform:    "openai",
+			Type:        "oauth",
+			Credentials: credentials,
+			ProxyID:     req.ProxyID,
+			Concurrency: req.Concurrency,
+			Priority:    req.Priority,
+			GroupIDs:    req.GroupIDs,
+		})
+		if err != nil {
+			response.ErrorFrom(c, err)
+			return
+		}
+
+		response.Success(c, gin.H{
+			"success":       true,
+			"refresh_token": result.RefreshToken,
+			"account_id":    account.ID,
+			"email":         result.Email,
+		})
+		return
+	}
+
+	response.Success(c, gin.H{
+		"success":       result.Success,
+		"refresh_token": result.RefreshToken,
+		"email":         result.Email,
+		"error":         result.Error,
+	})
 }
 
 // SessionToRT converts session token to refresh token
@@ -137,8 +202,10 @@ func (h *OpenAIRegisterHandler) FetchEmailCode(c *gin.Context) {
 	}
 
 	// 创建邮局客户端
-	client := NewCloudMailClient(CloudMailConfig{
-		BaseURL: req.BaseURL,
+	client := cloudmail.NewClient(cloudmail.Config{
+		BaseURL:       req.BaseURL,
+		AdminEmail:    req.AdminEmail,
+		AdminPassword: req.AdminPassword,
 	})
 
 	// 登录获取token
@@ -180,8 +247,10 @@ func (h *OpenAIRegisterHandler) CreateMailUser(c *gin.Context) {
 
 	fullEmail := req.Email + "@" + req.Domain
 
-	client := NewCloudMailClient(CloudMailConfig{
-		BaseURL: req.BaseURL,
+	client := cloudmail.NewClient(cloudmail.Config{
+		BaseURL:       req.BaseURL,
+		AdminEmail:    req.AdminEmail,
+		AdminPassword: req.AdminPassword,
 	})
 
 	if err := client.Login(c.Request.Context(), req.AdminEmail, req.AdminPassword); err != nil {

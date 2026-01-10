@@ -34,17 +34,13 @@
           <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('admin.accounts.openaiRegister.password') }}</label>
           <Input v-model="form.password" type="password" :placeholder="t('admin.accounts.openaiRegister.passwordPlaceholder')" />
         </div>
-        <!-- 验证码获取 -->
-        <div v-if="form.email && form.email.includes('@')">
-          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">验证码</label>
-          <div class="flex gap-2">
-            <Input v-model="verifyCode" placeholder="6位验证码" class="flex-1" />
-            <button @click="fetchVerifyCode" :disabled="fetchingCode" class="rounded-lg bg-blue-600 px-3 py-2 text-sm text-white hover:bg-blue-700 disabled:opacity-50">
-              {{ fetchingCode ? '获取中...' : '获取验证码' }}
-            </button>
-          </div>
-          <p v-if="codeError" class="mt-1 text-sm text-red-500">{{ codeError }}</p>
+        <!-- 自动化流程提示 -->
+        <div class="rounded-lg bg-blue-50 p-3 dark:bg-blue-900/20">
+          <p class="text-sm text-blue-700 dark:text-blue-300">
+            🚀 一键自动完成：注册 → 获取验证码 → 验证邮箱 → 登录获取 RT
+          </p>
         </div>
+        <p v-if="codeError" class="text-sm text-red-500">{{ codeError }}</p>
       </div>
 
       <!-- Session to RT Form -->
@@ -136,9 +132,7 @@ const loading = ref(false)
 const result = ref<{ success: boolean; refresh_token?: string; account_id?: number; error?: string } | null>(null)
 
 // 邮局相关状态
-const verifyCode = ref('')
 const generatingEmail = ref(false)
-const fetchingCode = ref(false)
 const codeError = ref('')
 
 // 邮局配置（硬编码）
@@ -199,37 +193,24 @@ async function generateTempEmail() {
   }
 }
 
-// 获取验证码
-async function fetchVerifyCode() {
-  fetchingCode.value = true
-  codeError.value = ''
-  try {
-    const resp = await openaiRegisterAPI.fetchEmailCode({
-      to_email: form.value.email,
-      admin_email: MAIL_CONFIG.adminEmail,
-      admin_password: MAIL_CONFIG.adminPassword,
-      base_url: MAIL_CONFIG.baseUrl
-    })
-    verifyCode.value = resp.code
-  } catch (e: any) {
-    codeError.value = e.message || '获取验证码失败'
-  } finally {
-    fetchingCode.value = false
-  }
-}
-
 async function submit() {
   loading.value = true
   result.value = null
+  codeError.value = ''
   try {
     if (mode.value === 'auto') {
+      // 一键自动完成：注册 → 获取验证码 → 验证邮箱 → 登录获取RT
       result.value = await openaiRegisterAPI.autoRegister({
         email: form.value.email,
         password: form.value.password,
         proxy_id: form.value.proxyId ?? undefined,
         name: form.value.name || undefined,
         group_ids: form.value.groupIds.length ? form.value.groupIds : undefined,
-        create_account: form.value.createAccount
+        create_account: form.value.createAccount,
+        // 传递邮局配置，后端自动轮询获取验证码
+        mail_base_url: MAIL_CONFIG.baseUrl,
+        mail_admin_email: MAIL_CONFIG.adminEmail,
+        mail_admin_password: MAIL_CONFIG.adminPassword
       })
     } else {
       result.value = await openaiRegisterAPI.sessionToRT({

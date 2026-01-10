@@ -14,6 +14,10 @@ export interface AutoRegisterRequest {
   priority?: number
   concurrency?: number
   create_account?: boolean
+  // 邮局配置（用于自动获取验证码）
+  mail_base_url?: string
+  mail_admin_email?: string
+  mail_admin_password?: string
 }
 
 export interface AutoRegisterResponse {
