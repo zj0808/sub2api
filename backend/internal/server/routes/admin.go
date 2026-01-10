@@ -151,6 +151,14 @@ func registerOpenAIOAuthRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 		openai.POST("/refresh-token", h.Admin.OpenAIOAuth.RefreshToken)
 		openai.POST("/accounts/:id/refresh", h.Admin.OpenAIOAuth.RefreshAccountToken)
 		openai.POST("/create-from-oauth", h.Admin.OpenAIOAuth.CreateAccountFromOAuth)
+
+		// OpenAI 自动注册 & Session to RT (admin only)
+		openai.POST("/auto-register", h.Admin.OpenAIRegister.AutoRegister)
+		openai.POST("/session-to-rt", h.Admin.OpenAIRegister.SessionToRT)
+
+		// 邮局相关 API
+		openai.POST("/fetch-email-code", h.Admin.OpenAIRegister.FetchEmailCode)
+		openai.POST("/create-mail-user", h.Admin.OpenAIRegister.CreateMailUser)
 	}
 }
 

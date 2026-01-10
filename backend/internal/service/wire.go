@@ -90,6 +90,7 @@ var ProviderSet = wire.NewSet(
 	NewOpenAIGatewayService,
 	NewOAuthService,
 	NewOpenAIOAuthService,
+	NewOpenAIRegisterService,
 	NewGeminiOAuthService,
 	NewGeminiQuotaService,
 	NewAntigravityOAuthService,

@@ -1008,6 +1008,7 @@ export default {
       title: '账号管理',
       description: '管理 AI 平台账号和 Cookie',
       createAccount: '添加账号',
+      openaiRegisterBtn: 'OpenAI 注册',
       syncFromCrs: '从 CRS 同步',
       syncFromCrsTitle: '从 CRS 同步账号',
       syncFromCrsDesc:
@@ -1259,6 +1260,25 @@ export default {
       openai: {
         baseUrlHint: '留空使用官方 OpenAI API',
         apiKeyHint: '您的 OpenAI API Key'
+      },
+      // OpenAI Register
+      openaiRegister: {
+        button: 'OpenAI 注册',
+        title: 'OpenAI 账号注册',
+        autoMode: '自动注册',
+        autoModeDesc: '输入邮箱密码自动注册并获取 RT',
+        sessionMode: 'Session 转 RT',
+        sessionModeDesc: '使用已有的 Session Token 获取 RT',
+        email: '邮箱',
+        emailPlaceholder: '请输入 OpenAI 账号邮箱',
+        password: '密码',
+        passwordPlaceholder: '请输入密码',
+        sessionToken: 'Session Token',
+        sessionTokenPlaceholder: '请输入 __Secure-next-auth.session-token',
+        createAccount: '同时创建账号',
+        namePlaceholder: '账号名称（可选）',
+        success: '操作成功',
+        failed: '操作失败'
       },
       modelRestriction: '模型限制（可选）',
       modelWhitelist: '模型白名单',

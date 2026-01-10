@@ -4,6 +4,7 @@
       <Icon name="refresh" size="md" :class="[loading ? 'animate-spin' : '']" />
     </button>
     <button @click="$emit('sync')" class="btn btn-secondary">{{ t('admin.accounts.syncFromCrs') }}</button>
+    <button @click="$emit('openaiRegister')" class="btn btn-secondary">{{ t('admin.accounts.openaiRegister.button') }}</button>
     <button @click="$emit('create')" class="btn btn-primary">{{ t('admin.accounts.createAccount') }}</button>
   </div>
 </template>
@@ -13,7 +14,7 @@ import { useI18n } from 'vue-i18n'
 import Icon from '@/components/icons/Icon.vue'
 
 defineProps(['loading'])
-defineEmits(['refresh', 'sync', 'create'])
+defineEmits(['refresh', 'sync', 'create', 'openaiRegister'])
 
 const { t } = useI18n()
 </script>

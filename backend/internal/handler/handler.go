@@ -12,6 +12,7 @@ type AdminHandlers struct {
 	Account          *admin.AccountHandler
 	OAuth            *admin.OAuthHandler
 	OpenAIOAuth      *admin.OpenAIOAuthHandler
+	OpenAIRegister   *admin.OpenAIRegisterHandler
 	GeminiOAuth      *admin.GeminiOAuthHandler
 	AntigravityOAuth *admin.AntigravityOAuthHandler
 	Proxy            *admin.ProxyHandler

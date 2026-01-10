@@ -932,6 +932,7 @@ export default {
       title: 'Account Management',
       description: 'Manage AI platform accounts and credentials',
       createAccount: 'Create Account',
+      openaiRegisterBtn: 'OpenAI Register',
       syncFromCrs: 'Sync from CRS',
       syncFromCrsTitle: 'Sync Accounts from CRS',
       syncFromCrsDesc:
@@ -1122,6 +1123,25 @@ export default {
       openai: {
         baseUrlHint: 'Leave default for official OpenAI API',
         apiKeyHint: 'Your OpenAI API Key'
+      },
+      // OpenAI Register
+      openaiRegister: {
+        button: 'OpenAI Register',
+        title: 'OpenAI Account Registration',
+        autoMode: 'Auto Register',
+        autoModeDesc: 'Enter email and password to auto-register and get RT',
+        sessionMode: 'Session to RT',
+        sessionModeDesc: 'Use existing Session Token to get RT',
+        email: 'Email',
+        emailPlaceholder: 'Enter OpenAI account email',
+        password: 'Password',
+        passwordPlaceholder: 'Enter password',
+        sessionToken: 'Session Token',
+        sessionTokenPlaceholder: 'Enter __Secure-next-auth.session-token',
+        createAccount: 'Also create account',
+        namePlaceholder: 'Account name (optional)',
+        success: 'Operation successful',
+        failed: 'Operation failed'
       },
       modelRestriction: 'Model Restriction (Optional)',
       modelWhitelist: 'Model Whitelist',
